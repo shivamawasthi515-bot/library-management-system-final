@@ -112,3 +112,17 @@ function updateUserRole(userId, role) {
     body: JSON.stringify({ role })
   });
 }
+
+function forgotPasswordAPI(email) {
+  return request('/auth/forgot-password', {
+    method: 'POST',
+    body: JSON.stringify({ email })
+  });
+}
+
+function resetPasswordAPI(token, password) {
+  return request(`/auth/reset-password/${token}`, {
+    method: 'POST',
+    body: JSON.stringify({ password })
+  });
+}
