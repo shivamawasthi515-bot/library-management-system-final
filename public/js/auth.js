@@ -20,7 +20,8 @@ async function handleLogin(event) {
     localStorage.setItem('token', data.token);
     localStorage.setItem('currentUser', JSON.stringify(data.user));
     renderMessage('login-message', 'success', 'Login successful, redirecting...');
-    window.location.href = getRedirectPath('/dashboard');
+    const defaultPath = data.user.role === 'admin' ? '/admin' : '/dashboard';
+    window.location.href = getRedirectPath(defaultPath);
   } catch (error) {
     renderMessage('login-message', 'error', error.message);
   }

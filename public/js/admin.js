@@ -16,19 +16,36 @@ async function loadAdminData() {
 async function loadUsers() {
   try {
     const data = await listUsers();
+    const currentUser = getCurrentUser();
     document.getElementById('admin-users').innerHTML = data.users
       .map(
         (u) => `
       <div class="book-card">
         <h3>${u.name}</h3>
         <p>${u.email}</p>
-        <p><strong>Role:</strong> ${u.role}</p>
+        <p><strong>Role:</strong> <span id="role-${u._id}">${u.role}</span></p>
+        ${
+          currentUser && u._id !== currentUser.id
+            ? `<button class="btn btn-small" onclick="changeRole('${u._id}', '${u.role === 'admin' ? 'user' : 'admin'}')">
+                Make ${u.role === 'admin' ? 'User' : 'Admin'}
+               </button>`
+            : ''
+        }
       </div>
     `
       )
       .join('');
   } catch (error) {
     document.getElementById('admin-users').innerHTML = `<div class="error">${error.message}</div>`;
+  }
+}
+
+async function changeRole(userId, newRole) {
+  try {
+    await updateUserRole(userId, newRole);
+    await loadUsers();
+  } catch (error) {
+    alert(error.message);
   }
 }
 
