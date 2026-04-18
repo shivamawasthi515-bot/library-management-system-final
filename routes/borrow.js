@@ -10,6 +10,9 @@ router.post('/borrow/:bookId', authRequired, async (req, res) => {
   const session = await mongoose.startSession();
   try {
     const bookId = req.params.bookId;
+    if (!mongoose.isValidObjectId(bookId)) {
+      return res.status(400).json({ success: false, error: 'Invalid book id' });
+    }
     session.startTransaction();
 
     const book = await Book.findById(bookId).session(session);
@@ -49,6 +52,9 @@ router.post('/borrow/:bookId', authRequired, async (req, res) => {
 router.post('/return/:borrowId', authRequired, async (req, res) => {
   const session = await mongoose.startSession();
   try {
+    if (!mongoose.isValidObjectId(req.params.borrowId)) {
+      return res.status(400).json({ success: false, error: 'Invalid borrow id' });
+    }
     session.startTransaction();
 
     const borrow = await Borrow.findById(req.params.borrowId).session(session);

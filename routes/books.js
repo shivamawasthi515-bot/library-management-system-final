@@ -1,4 +1,5 @@
 const express = require('express');
+const mongoose = require('mongoose');
 const Book = require('../models/Book');
 const { authRequired, requireRole } = require('../middleware/auth');
 const cache = require('../utils/cache');
@@ -12,7 +13,9 @@ router.get('/', async (req, res) => {
     const skip = (page - 1) * limit;
 
     const filters = { isActive: true };
-    if (req.query.resourceType) filters.resourceType = req.query.resourceType;
+    if (req.query.resourceType && ['physical', 'digital', 'hybrid'].includes(String(req.query.resourceType))) {
+      filters.resourceType = req.query.resourceType;
+    }
     if (req.query.availableOnly === 'true') filters.availableCopies = { $gt: 0 };
 
     const cacheKey = `books:list:${JSON.stringify({ page, limit, filters })}`;
@@ -34,6 +37,9 @@ router.get('/', async (req, res) => {
 
 router.get('/:id', async (req, res) => {
   try {
+    if (!mongoose.isValidObjectId(req.params.id)) {
+      return res.status(400).json({ success: false, error: 'Invalid book id' });
+    }
     const book = await Book.findById(req.params.id).lean();
     if (!book || !book.isActive) {
       return res.status(404).json({ success: false, error: 'Book not found' });
@@ -69,6 +75,9 @@ router.post('/', authRequired, requireRole('admin'), async (req, res) => {
 
 router.put('/:id', authRequired, requireRole('admin'), async (req, res) => {
   try {
+    if (!mongoose.isValidObjectId(req.params.id)) {
+      return res.status(400).json({ success: false, error: 'Invalid book id' });
+    }
     const update = { ...req.body };
     if (Array.isArray(update.authors)) update.authors = update.authors.map((a) => String(a).trim()).filter(Boolean);
     if (Array.isArray(update.tags)) update.tags = update.tags.map((t) => String(t).toLowerCase());
@@ -87,6 +96,9 @@ router.put('/:id', authRequired, requireRole('admin'), async (req, res) => {
 
 router.delete('/:id', authRequired, requireRole('admin'), async (req, res) => {
   try {
+    if (!mongoose.isValidObjectId(req.params.id)) {
+      return res.status(400).json({ success: false, error: 'Invalid book id' });
+    }
     const book = await Book.findByIdAndUpdate(req.params.id, { isActive: false }, { new: true }).lean();
     if (!book) return res.status(404).json({ success: false, error: 'Book not found' });
 

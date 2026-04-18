@@ -6,6 +6,20 @@ const { normalizeText, buildPartialRegex, rankBooks } = require('../utils/search
 const { optionalAiEnhanceSearch } = require('../services/aiSearchAdapter');
 
 const router = express.Router();
+const SEARCH_CANDIDATE_LIMIT = Math.min(Math.max(Number(process.env.SEARCH_CANDIDATE_LIMIT || 100), 20), 300);
+const searchProjection = {
+  score: { $meta: 'textScore' },
+  title: 1,
+  authors: 1,
+  description: 1,
+  tags: 1,
+  resourceType: 1,
+  availableCopies: 1,
+  totalCopies: 1,
+  digitalUrl: 1,
+  fileUrl: 1,
+  category: 1
+};
 
 router.get('/', async (req, res) => {
   try {
@@ -33,10 +47,10 @@ router.get('/', async (req, res) => {
     const [textMatches, partialMatches] = await Promise.all([
       Book.find(
         { $text: { $search: q }, isActive: true },
-        { score: { $meta: 'textScore' }, title: 1, authors: 1, description: 1, tags: 1, resourceType: 1, availableCopies: 1, totalCopies: 1, digitalUrl: 1, fileUrl: 1, category: 1 }
+        searchProjection
       )
         .sort({ score: { $meta: 'textScore' } })
-        .limit(120)
+        .limit(SEARCH_CANDIDATE_LIMIT)
         .lean(),
       partialRegex
         ? Book.find({
@@ -48,7 +62,7 @@ router.get('/', async (req, res) => {
               { tags: partialRegex }
             ]
           })
-            .limit(120)
+            .limit(SEARCH_CANDIDATE_LIMIT)
             .lean()
         : []
     ]);

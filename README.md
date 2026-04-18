@@ -41,6 +41,8 @@ Optional:
 - `MONGODB_DB`
 - `PORT`
 - `DEFAULT_BORROW_DAYS`
+- `SEARCH_CANDIDATE_LIMIT`
+- `RATE_LIMIT_WINDOW_MS`, `RATE_LIMIT_MAX`
 - `USE_OPENAI_SEARCH` (defaults to false; local search remains default)
 - `OPENAI_API_KEY` (placeholder only)
 - `EMAIL_PROVIDER`, `SMS_PROVIDER` (placeholders)

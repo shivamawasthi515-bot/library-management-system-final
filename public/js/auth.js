@@ -4,6 +4,11 @@ function renderMessage(targetId, kind, text) {
   el.innerHTML = `<div class="${kind}">${text}</div>`;
 }
 
+function getRedirectPath(defaultPath) {
+  const redirect = new URLSearchParams(window.location.search).get('redirect');
+  return redirect && redirect.startsWith('/') ? redirect : defaultPath;
+}
+
 async function handleLogin(event) {
   event.preventDefault();
   const email = document.getElementById('email').value.trim();
@@ -15,9 +20,7 @@ async function handleLogin(event) {
     localStorage.setItem('token', data.token);
     localStorage.setItem('currentUser', JSON.stringify(data.user));
     renderMessage('login-message', 'success', 'Login successful, redirecting...');
-    setTimeout(() => {
-      window.location.href = '/dashboard';
-    }, 700);
+    window.location.href = getRedirectPath('/dashboard');
   } catch (error) {
     renderMessage('login-message', 'error', error.message);
   }
@@ -41,9 +44,7 @@ async function handleRegister(event) {
     renderMessage('register-message', 'loading', 'Creating account...');
     await registerAPI(name, email, password);
     renderMessage('register-message', 'success', 'Registration successful, redirecting to login...');
-    setTimeout(() => {
-      window.location.href = '/login';
-    }, 700);
+    window.location.href = '/login?redirect=/dashboard';
   } catch (error) {
     renderMessage('register-message', 'error', error.message);
   }

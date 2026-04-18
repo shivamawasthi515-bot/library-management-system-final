@@ -4,6 +4,7 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 const path = require('path');
 const { requestLogger, metricsCollector, getMetricsSnapshot } = require('./middleware/metrics');
+const { rateLimit } = require('./middleware/rateLimit');
 
 const app = express();
 const PORT = Number(process.env.PORT || 3001);
@@ -13,6 +14,7 @@ app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use(requestLogger);
 app.use(metricsCollector);
+app.use('/api', rateLimit({ windowMs: Number(process.env.RATE_LIMIT_WINDOW_MS || 60_000), max: Number(process.env.RATE_LIMIT_MAX || 180) }));
 
 app.use(express.static(path.join(__dirname, 'public')));
 
@@ -52,6 +54,9 @@ async function start() {
   try {
     if (!process.env.MONGODB_URI) {
       throw new Error('MONGODB_URI is required');
+    }
+    if (!process.env.JWT_SECRET) {
+      throw new Error('JWT_SECRET is required');
     }
     await mongoose.connect(process.env.MONGODB_URI, { dbName: process.env.MONGODB_DB || undefined });
     console.log('MongoDB connected');

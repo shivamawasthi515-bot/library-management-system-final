@@ -8,6 +8,7 @@ function get(key) {
     store.delete(key);
     return null;
   }
+  // LRU policy: refresh recency by moving the touched key to the end of the Map.
   store.delete(key);
   store.set(key, entry);
   return entry.value;
