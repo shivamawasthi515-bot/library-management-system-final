@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login - Library Management System</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <nav class="navbar">
+    <div class="container">
+      <h1>📚 Library Management System</h1>
+      <div class="nav-links">
+        <a href="/">Home</a>
+        <a href="/books">Books</a>
+        <a href="/login">Login</a>
+        <a href="/register">Register</a>
+	<span id="nav-user" style="color:white; font-weight:600;"></span>
+<button id="nav-logout" style="display:none;" class="btn">Logout</button>
+      </div>
+    </div>
+  </nav>
+
+  <main class="container">
+    <section class="auth-section">
+      <div class="auth-form">
+        <h2>🔐 Login</h2>
+        
+        <form onsubmit="return handleLogin(event);">
+          <div class="form-group">
+            <label for="email">Email:</label>
+            <input type="email" id="email" placeholder="Enter email" required>
+          </div>
+
+          <div class="form-group">
+            <label for="password">Password:</label>
+            <input type="password" id="password" placeholder="Enter password" required>
+          </div>
+
+          <button type="submit" class="btn btn-primary">Login</button>
+        </form>
+
+        <p style="text-align: center; margin-top: 1rem;">
+          Don't have account? <a href="/register">Register here</a>
+        </p>
+
+        <div id="login-message"></div>
+      </div>
+    </section>
+  </main>
+
+  <script src="js/api.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/nav.js"></script>
+</body>
+</html>
