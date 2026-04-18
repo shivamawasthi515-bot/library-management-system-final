@@ -1,66 +1,53 @@
-console.log('📖 Books.js loaded');
+let currentBooks = [];
 
-document.addEventListener('DOMContentLoaded', loadAllBooks);
+async function loadBooks() {
+  const list = document.getElementById('books-list');
+  list.innerHTML = '<div class="loading">Loading books...</div>';
 
-async function loadAllBooks() {
   try {
-    const booksDiv = document.getElementById('books-list');
-    if (!booksDiv) return;
-    
-    booksDiv.innerHTML = '<div class="loading">Loading...</div>';
-    const data = await getAllBooks();
-    
-    if (data.books && data.books.length > 0) {
-      booksDiv.innerHTML = `<p><strong>Total: ${data.total}</strong></p>` + 
-        data.books.map(b => `
-          <div class="book-card">
-            <h3>${b.title}</h3>
-            <p><strong>Author:</strong> ${b.author}</p>
-            <p><strong>Category:</strong> ${b.category}</p>
-            <p><strong>Year:</strong> ${b.publicationYear}</p>
-            <p><strong>Available:</strong> ${b.availableCopies}/${b.totalCopies}</p>
-          </div>
-        `).join('');
-    } else {
-      booksDiv.innerHTML = '<p>No books found</p>';
+    const q = document.getElementById('searchInput').value.trim();
+    const data = q ? await smartSearch(q, 1, 20) : await getBooks(1, 20);
+    currentBooks = data.books || [];
+
+    if (!currentBooks.length) {
+      list.innerHTML = '<p>No books found.</p>';
+      return;
     }
+
+    list.innerHTML = currentBooks
+      .map(
+        (b) => `
+      <div class="book-card">
+        <h3>${b.title}</h3>
+        <p><strong>Authors:</strong> ${(b.authors || []).join(', ')}</p>
+        <p><strong>Type:</strong> ${b.resourceType}</p>
+        <p><strong>Category:</strong> ${b.category || 'General'}</p>
+        <p><strong>Available:</strong> ${b.availableCopies}/${b.totalCopies}</p>
+        ${b.digitalUrl ? `<p><a href="${b.digitalUrl}" target="_blank" rel="noreferrer">Open digital resource</a></p>` : ''}
+        <button class="btn" onclick="borrow('${b._id}')">Borrow/Request</button>
+      </div>
+    `
+      )
+      .join('');
   } catch (error) {
-    const booksDiv = document.getElementById('books-list');
-    if (booksDiv) {
-      booksDiv.innerHTML = `<div class="error">Error: ${error.message}</div>`;
-    }
+    list.innerHTML = `<div class="error">${error.message}</div>`;
   }
 }
 
-async function searchBooks() {
-  const query = document.getElementById('searchInput').value;
-  if (!query) {
-    loadAllBooks();
+async function borrow(bookId) {
+  if (!localStorage.getItem('token')) {
+    alert('Please login first');
+    window.location.href = '/login';
     return;
   }
-  
+
   try {
-    const booksDiv = document.getElementById('books-list');
-    booksDiv.innerHTML = '<div class="loading">Searching...</div>';
-    
-    const data = await searchBooksAPI(query);
-    
-    if (data.books && data.books.length > 0) {
-      booksDiv.innerHTML = `<p><strong>Found: ${data.total}</strong></p>` + 
-        data.books.map(b => `
-          <div class="book-card">
-            <h3>${b.title}</h3>
-            <p><strong>Author:</strong> ${b.author}</p>
-            <p><strong>Available:</strong> ${b.availableCopies}/${b.totalCopies}</p>
-          </div>
-        `).join('');
-    } else {
-      booksDiv.innerHTML = '<p>No books found</p>';
-    }
+    await borrowBook(bookId);
+    alert('Book borrowed/requested successfully');
+    loadBooks();
   } catch (error) {
-    const booksDiv = document.getElementById('books-list');
-    if (booksDiv) {
-      booksDiv.innerHTML = `<div class="error">Error: ${error.message}</div>`;
-    }
+    alert(error.message);
   }
 }
+
+document.addEventListener('DOMContentLoaded', loadBooks);

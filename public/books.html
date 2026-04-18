@@ -3,40 +3,39 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Books - Library Management System</title>
-  <link rel="stylesheet" href="css/style.css">
+  <title>Books - HLMS</title>
+  <link rel="stylesheet" href="/css/style.css">
 </head>
 <body>
   <nav class="navbar">
-    <div class="container">
-      <h1>📚 Library Management System</h1>
+    <div class="container nav-wrap">
+      <h1>📚 HLMS</h1>
       <div class="nav-links">
         <a href="/">Home</a>
         <a href="/books">Books</a>
+        <a id="nav-dashboard" href="/dashboard" style="display:none;">Dashboard</a>
+        <a id="nav-admin" href="/admin" style="display:none;">Admin</a>
         <a href="/login">Login</a>
         <a href="/register">Register</a>
-	<span id="nav-user" style="color:white; font-weight:600;"></span>
-<button id="nav-logout" style="display:none;" class="btn">Logout</button>
+        <span id="nav-user"></span>
+        <button id="nav-logout" class="btn btn-small" style="display:none;">Logout</button>
       </div>
     </div>
   </nav>
 
   <main class="container">
     <section class="section">
-      <h2>📖 Books Catalog</h2>
-      
+      <h2>Books Catalog</h2>
       <div class="search-section">
-        <input type="text" id="searchInput" placeholder="Search books...">
-        <button onclick="searchBooks()" class="btn">Search</button>
-        <button onclick="loadAllBooks()" class="btn">Show All</button>
+        <input id="searchInput" type="text" placeholder="Search title, author, keywords, misspellings..." onkeyup="if(event.key==='Enter'){loadBooks();}">
+        <button class="btn" onclick="loadBooks()">Search</button>
       </div>
-
       <div id="books-list"></div>
     </section>
   </main>
 
-  <script src="js/api.js"></script>
-  <script src="js/books.js"></script>
-  <script src="js/nav.js"></script>	
+  <script src="/js/api.js"></script>
+  <script src="/js/nav.js"></script>
+  <script src="/js/books.js"></script>
 </body>
 </html>

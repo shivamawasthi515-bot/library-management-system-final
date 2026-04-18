@@ -1,8 +1,6 @@
+const MAX_ITEMS = 250;
 const store = new Map();
 
-/**
- * Get cached value by key.
- */
 function get(key) {
   const entry = store.get(key);
   if (!entry) return null;
@@ -10,19 +8,21 @@ function get(key) {
     store.delete(key);
     return null;
   }
+  store.delete(key);
+  store.set(key, entry);
   return entry.value;
 }
 
-/**
- * Set cached value with TTL (ms).
- */
 function set(key, value, ttlMs = 30_000) {
+  if (store.has(key)) store.delete(key);
   store.set(key, { value, expiresAt: Date.now() + ttlMs });
+
+  while (store.size > MAX_ITEMS) {
+    const firstKey = store.keys().next().value;
+    store.delete(firstKey);
+  }
 }
 
-/**
- * Delete key(s) by prefix, helpful after writes.
- */
 function delByPrefix(prefix) {
   for (const key of store.keys()) {
     if (key.startsWith(prefix)) store.delete(key);
