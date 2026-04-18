@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Setup - HLMS</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <nav class="navbar">
+    <div class="container nav-wrap">
+      <h1>📚 HLMS</h1>
+      <div class="nav-links">
+        <a href="/">Home</a>
+        <a href="/login">Login</a>
+        <a href="/register">Register</a>
+      </div>
+    </div>
+  </nav>
+
+  <main class="container auth-section">
+    <section class="auth-form">
+      <h2>First-Time Admin Setup</h2>
+      <p style="margin-bottom:1rem;color:#555;">
+        Create the initial admin account. This page is only available while no admin exists.
+      </p>
+      <div id="setup-check-message"></div>
+      <form id="setup-form" onsubmit="return handleSetupAdmin(event)">
+        <div class="form-group">
+          <label for="setup-name">Name</label>
+          <input id="setup-name" type="text" required>
+        </div>
+        <div class="form-group">
+          <label for="setup-email">Email</label>
+          <input id="setup-email" type="email" required>
+        </div>
+        <div class="form-group">
+          <label for="setup-password">Password (min 6 chars)</label>
+          <input id="setup-password" type="password" minlength="6" required>
+        </div>
+        <div class="form-group">
+          <label for="setup-confirm">Confirm Password</label>
+          <input id="setup-confirm" type="password" minlength="6" required>
+        </div>
+        <button type="submit" class="btn btn-primary">Create Admin Account</button>
+      </form>
+      <p style="margin-top:1rem;"><a href="/login">Back to Login</a></p>
+      <div id="setup-message"></div>
+    </section>
+  </main>
+
+  <script src="/js/api.js"></script>
+  <script src="/js/auth.js"></script>
+  <script>
+    // If admin already exists, disable the form and show a message
+    checkSetupAPI().then(function(data) {
+      if (!data.setupNeeded) {
+        document.getElementById('setup-form').style.display = 'none';
+        document.getElementById('setup-check-message').innerHTML =
+          '<div class="success">Admin account already exists. <a href="/login">Log in here</a>.</div>';
+      }
+    }).catch(function() {});
+  </script>
+</body>
+</html>

@@ -126,3 +126,14 @@ function resetPasswordAPI(token, password) {
     body: JSON.stringify({ password })
   });
 }
+
+function checkSetupAPI() {
+  return request('/auth/setup-admin');
+}
+
+function setupAdminAPI(name, email, password) {
+  return request('/auth/setup-admin', {
+    method: 'POST',
+    body: JSON.stringify({ name, email, password })
+  });
+}

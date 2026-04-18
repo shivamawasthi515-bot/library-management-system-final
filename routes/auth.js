@@ -67,6 +67,51 @@ router.get('/me', authRequired, async (req, res) => {
   return res.json({ success: true, user: req.user });
 });
 
+// Returns whether the first-admin setup is still needed (no admin user exists yet)
+router.get('/setup-admin', async (req, res) => {
+  try {
+    const adminCount = await User.countDocuments({ role: 'admin' });
+    return res.json({ success: true, setupNeeded: adminCount === 0 });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Creates the very first admin account — only works while no admin exists
+router.post('/setup-admin', async (req, res) => {
+  try {
+    const adminCount = await User.countDocuments({ role: 'admin' });
+    if (adminCount > 0) {
+      return res.status(409).json({ success: false, error: 'An admin account already exists. Please log in.' });
+    }
+
+    const { name, email, password } = req.body || {};
+    if (!name || !email || !password || String(password).length < 6) {
+      return res.status(400).json({ success: false, error: 'Name, email and password (min 6 chars) are required' });
+    }
+
+    // If a regular account already exists for this email, promote it instead of creating a duplicate
+    let user = await User.findOne({ email: String(email).toLowerCase() });
+    if (user) {
+      user.role = 'admin';
+      await user.save();
+    } else {
+      user = new User({ name, email: String(email).toLowerCase(), role: 'admin' });
+      await user.setPassword(password);
+      await user.save();
+    }
+
+    const token = createToken(user);
+    return res.status(201).json({
+      success: true,
+      token,
+      user: { id: user._id, name: user.name, email: user.email, role: user.role }
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 router.post('/forgot-password', async (req, res) => {
   try {
     const { email } = req.body || {};

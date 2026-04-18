@@ -34,11 +34,19 @@
         <button type="submit" class="btn btn-primary">Login</button>
       </form>
       <p>New user? <a href="/register">Create account</a> &nbsp;|&nbsp; <a href="/forgot-password">Forgot password?</a></p>
+      <p id="setup-link" style="display:none;margin-top:0.5rem;">
+        First time here? <a href="/setup">Create the admin account</a>
+      </p>
       <div id="login-message"></div>
     </section>
   </main>
 
   <script src="/js/api.js"></script>
   <script src="/js/auth.js"></script>
+  <script>
+    checkSetupAPI().then(function(data) {
+      if (data.setupNeeded) document.getElementById('setup-link').style.display = 'block';
+    }).catch(function() {});
+  </script>
 </body>
 </html>

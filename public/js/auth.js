@@ -13,7 +13,7 @@ function getRedirectPath(defaultPath) {
 (function redirectIfLoggedIn() {
   const raw = localStorage.getItem('currentUser');
   if (!raw) return;
-  const isAuthPage = ['/login', '/register', '/forgot-password'].includes(window.location.pathname);
+  const isAuthPage = ['/login', '/register', '/forgot-password', '/setup'].includes(window.location.pathname);
   if (!isAuthPage) return;
   try {
     const user = JSON.parse(raw);
@@ -117,6 +117,32 @@ async function handleResetPassword(event) {
     document.getElementById('rp-form').style.display = 'none';
   } catch (error) {
     renderMessage('rp-message', 'error', error.message);
+  }
+
+  return false;
+}
+
+async function handleSetupAdmin(event) {
+  event.preventDefault();
+  const name = document.getElementById('setup-name').value.trim();
+  const email = document.getElementById('setup-email').value.trim();
+  const password = document.getElementById('setup-password').value;
+  const confirm = document.getElementById('setup-confirm').value;
+
+  if (password !== confirm) {
+    renderMessage('setup-message', 'error', 'Passwords do not match');
+    return false;
+  }
+
+  try {
+    renderMessage('setup-message', 'loading', 'Creating admin account...');
+    const data = await setupAdminAPI(name, email, password);
+    localStorage.setItem('token', data.token);
+    localStorage.setItem('currentUser', JSON.stringify(data.user));
+    renderMessage('setup-message', 'success', 'Admin account created! Redirecting to admin panel...');
+    window.location.href = '/admin';
+  } catch (error) {
+    renderMessage('setup-message', 'error', error.message);
   }
 
   return false;

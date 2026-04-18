@@ -44,14 +44,20 @@ app.get('/dashboard', (req, res) => res.sendFile(path.join(__dirname, 'public', 
 app.get('/admin', (req, res) => res.sendFile(path.join(__dirname, 'public', 'admin.html')));
 app.get('/forgot-password', (req, res) => res.sendFile(path.join(__dirname, 'public', 'forgot-password.html')));
 app.get('/reset-password', (req, res) => res.sendFile(path.join(__dirname, 'public', 'reset-password.html')));
+app.get('/setup', (req, res) => res.sendFile(path.join(__dirname, 'public', 'setup.html')));
 
 app.use((req, res) => {
   res.status(404).json({ success: false, error: 'Route not found' });
 });
 
 app.use((err, req, res, next) => {
+  const status = err.status || err.statusCode || 500;
   console.error('Unhandled error:', err);
-  res.status(500).json({ success: false, error: 'Internal server error' });
+  // For browser page requests (non-API) return a proper redirect rather than raw JSON
+  if (!req.path.startsWith('/api') && req.accepts('html')) {
+    return res.status(status).redirect('/');
+  }
+  res.status(status).json({ success: false, error: status === 404 ? 'Not found' : 'Internal server error' });
 });
 
 async function start() {
