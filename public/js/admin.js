@@ -183,7 +183,7 @@ async function loadUsers(page = 1) {
 async function changeRole(userId, newRole) {
   try {
     await updateUserRole(userId, newRole);
-    await loadUsers();
+    await loadUsers(_usersPage);
   } catch (error) {
     alert(error.message);
   }
@@ -192,7 +192,7 @@ async function changeRole(userId, newRole) {
 async function toggleActive(userId, isActive) {
   try {
     await setUserActive(userId, isActive);
-    await loadUsers();
+    await loadUsers(_usersPage);
   } catch (error) {
     alert(error.message);
   }

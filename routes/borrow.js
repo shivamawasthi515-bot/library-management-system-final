@@ -80,7 +80,8 @@ router.post('/return/:borrowId', authRequired, async (req, res) => {
 
     // Fine calculation: configurable per-day rate (default 1 unit per day overdue)
     if (borrow.dueAt && borrow.returnedAt > borrow.dueAt) {
-      const overdueDays = Math.ceil((borrow.returnedAt - borrow.dueAt) / (24 * 60 * 60 * 1000));
+      const MS_PER_DAY = 24 * 60 * 60 * 1000;
+      const overdueDays = Math.ceil((borrow.returnedAt - borrow.dueAt) / MS_PER_DAY);
       const ratePerDay = Number(process.env.FINE_PER_DAY || 1);
       borrow.fine = overdueDays * ratePerDay;
     }
