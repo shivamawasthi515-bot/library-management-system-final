@@ -3,6 +3,7 @@ const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const { authRequired } = require('../middleware/auth');
+const { sendMail } = require('../services/email');
 
 const router = express.Router();
 
@@ -65,6 +66,43 @@ router.post('/login', async (req, res) => {
 
 router.get('/me', authRequired, async (req, res) => {
   return res.json({ success: true, user: req.user });
+});
+
+router.put('/profile', authRequired, async (req, res) => {
+  try {
+    const { name, email, currentPassword, newPassword } = req.body || {};
+    const user = await User.findById(req.user._id);
+    if (!user) return res.status(404).json({ success: false, error: 'User not found' });
+
+    if (name) user.name = String(name).trim();
+
+    if (email) {
+      const emailLower = String(email).toLowerCase().trim();
+      if (emailLower !== user.email) {
+        const conflict = await User.findOne({ email: emailLower });
+        if (conflict) return res.status(409).json({ success: false, error: 'Email already in use' });
+        user.email = emailLower;
+      }
+    }
+
+    if (newPassword) {
+      if (!currentPassword) {
+        return res.status(400).json({ success: false, error: 'Current password is required to set a new password' });
+      }
+      const valid = await user.comparePassword(currentPassword);
+      if (!valid) return res.status(401).json({ success: false, error: 'Current password is incorrect' });
+      if (String(newPassword).length < 6) {
+        return res.status(400).json({ success: false, error: 'New password must be at least 6 characters' });
+      }
+      await user.setPassword(newPassword);
+    }
+
+    await user.save();
+    const updated = { id: user._id, name: user.name, email: user.email, role: user.role };
+    return res.json({ success: true, user: updated });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: error.message });
+  }
 });
 
 // Returns whether the first-admin setup is still needed (no admin user exists yet)
@@ -133,8 +171,21 @@ router.post('/forgot-password', async (req, res) => {
     user.resetPasswordExpires = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
     await user.save();
 
-    const resetUrl = `/reset-password?token=${token}`;
-    return res.json({ success: true, message: 'Password reset link generated.', resetUrl });
+    const baseUrl = process.env.APP_URL || `http://localhost:${process.env.PORT || 3001}`;
+    const resetUrl = `${baseUrl}/reset-password?token=${token}`;
+
+    await sendMail({
+      to: user.email,
+      subject: 'HLMS – Password Reset Request',
+      text: `Hello ${user.name},\n\nReset your password by visiting:\n${resetUrl}\n\nThis link expires in 1 hour.\n\nIf you did not request this, you can ignore this email.`,
+      html: `<p>Hello <strong>${user.name}</strong>,</p>
+<p>Reset your password by clicking the link below:</p>
+<p><a href="${resetUrl}">Reset Password</a></p>
+<p>This link expires in 1 hour.</p>
+<p>If you did not request this, you can ignore this email.</p>`
+    });
+
+    return res.json({ success: true, message: 'If that email is registered you will receive a reset link.' });
   } catch (error) {
     return res.status(500).json({ success: false, error: error.message });
   }

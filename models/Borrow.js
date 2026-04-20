@@ -7,6 +7,7 @@ const BorrowSchema = new mongoose.Schema(
     status: { type: String, enum: ['borrowed', 'returned'], default: 'borrowed', index: true },
     dueAt: { type: Date },
     returnedAt: { type: Date },
+    fine: { type: Number, default: 0 },
     note: { type: String, default: '' }
   },
   { timestamps: true }

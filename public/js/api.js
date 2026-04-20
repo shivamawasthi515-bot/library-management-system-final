@@ -102,8 +102,9 @@ function listSearchAnalytics() {
   return request('/admin/analytics/searches');
 }
 
-function listUsers() {
-  return request('/admin/users');
+function listUsers(page = 1, limit = 20, search = '') {
+  const q = search ? `&search=${encodeURIComponent(search)}` : '';
+  return request(`/admin/users?page=${page}&limit=${limit}${q}`);
 }
 
 function updateUserRole(userId, role) {
@@ -149,6 +150,28 @@ function resetPasswordAPI(token, password) {
   return request(`/auth/reset-password/${token}`, {
     method: 'POST',
     body: JSON.stringify({ password })
+  });
+}
+
+function updateProfileAPI(data) {
+  return request('/auth/profile', {
+    method: 'PUT',
+    body: JSON.stringify(data)
+  });
+}
+
+function myBorrowAlerts() {
+  return request('/borrows/me/alerts');
+}
+
+function getBookFeedback(bookId) {
+  return request(`/feedback/book/${bookId}`);
+}
+
+function submitBookFeedback(bookId, message, rating = 5) {
+  return request('/feedback', {
+    method: 'POST',
+    body: JSON.stringify({ message, rating, bookId })
   });
 }
 

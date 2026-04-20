@@ -14,6 +14,7 @@ const BookSchema = new mongoose.Schema(
     availableCopies: { type: Number, default: 1, min: 0, index: true },
     digitalUrl: { type: String, default: '' },
     fileUrl: { type: String, default: '' },
+    coverImage: { type: String, default: '' },
     isActive: { type: Boolean, default: true, index: true }
   },
   { timestamps: true }

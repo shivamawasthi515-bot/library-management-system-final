@@ -22,8 +22,20 @@ router.get('/analytics/searches', async (req, res) => {
 
 router.get('/users', async (req, res) => {
   try {
-    const users = await User.find({}).select('-passwordHash').sort({ createdAt: -1 }).lean();
-    return res.json({ success: true, users });
+    const page = Math.max(Number(req.query.page || 1), 1);
+    const limit = Math.min(Math.max(Number(req.query.limit || 20), 1), 100);
+    const skip = (page - 1) * limit;
+    const search = req.query.search ? String(req.query.search).trim() : '';
+
+    const filter = search
+      ? { $or: [{ name: { $regex: search, $options: 'i' } }, { email: { $regex: search, $options: 'i' } }] }
+      : {};
+
+    const [users, total] = await Promise.all([
+      User.find(filter).select('-passwordHash').sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
+      User.countDocuments(filter)
+    ]);
+    return res.json({ success: true, users, total, page, pages: Math.ceil(total / limit) });
   } catch (error) {
     return res.status(500).json({ success: false, error: error.message });
   }

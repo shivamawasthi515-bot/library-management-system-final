@@ -77,6 +77,14 @@ router.post('/return/:borrowId', authRequired, async (req, res) => {
 
     borrow.status = 'returned';
     borrow.returnedAt = new Date();
+
+    // Fine calculation: configurable per-day rate (default 1 unit per day overdue)
+    if (borrow.dueAt && borrow.returnedAt > borrow.dueAt) {
+      const overdueDays = Math.ceil((borrow.returnedAt - borrow.dueAt) / (24 * 60 * 60 * 1000));
+      const ratePerDay = Number(process.env.FINE_PER_DAY || 1);
+      borrow.fine = overdueDays * ratePerDay;
+    }
+
     await borrow.save({ session });
 
     const book = await Book.findById(borrow.book).session(session);
@@ -103,6 +111,25 @@ router.get('/borrows/me', authRequired, async (req, res) => {
       .sort({ createdAt: -1 })
       .lean();
     return res.json({ success: true, borrows });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Returns active borrows due within the next 2 days (for dashboard alerts)
+router.get('/borrows/me/alerts', authRequired, async (req, res) => {
+  try {
+    const now = new Date();
+    const soon = new Date(now.getTime() + 2 * 24 * 60 * 60 * 1000);
+    const alerts = await Borrow.find({
+      user: req.user._id,
+      status: 'borrowed',
+      dueAt: { $lte: soon }
+    })
+      .populate('book', 'title authors')
+      .sort({ dueAt: 1 })
+      .lean();
+    return res.json({ success: true, alerts });
   } catch (error) {
     return res.status(500).json({ success: false, error: error.message });
   }

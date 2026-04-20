@@ -77,16 +77,7 @@ async function handleForgotPassword(event) {
   try {
     renderMessage('fp-message', 'loading', 'Sending reset link...');
     const data = await forgotPasswordAPI(email);
-    if (data.resetUrl) {
-      renderMessage(
-        'fp-message',
-        'success',
-        `Reset link ready. <strong><a href="${data.resetUrl}">Click here to reset your password</a></strong><br>
-         <small style="color:#555">(In production this link would be sent to your email.)</small>`
-      );
-    } else {
-      renderMessage('fp-message', 'success', data.message);
-    }
+    renderMessage('fp-message', 'success', data.message);
   } catch (error) {
     renderMessage('fp-message', 'error', error.message);
   }

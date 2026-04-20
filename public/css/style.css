@@ -188,3 +188,43 @@ select {
     align-items: flex-start;
   }
 }
+
+/* ── Badge (availability) ────────────────────────────────── */
+.badge {
+  display: inline-block;
+  padding: 0.2rem 0.55rem;
+  border-radius: 12px;
+  color: #fff;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+/* ── Book cover thumbnail ─────────────────────────────────── */
+.book-cover {
+  width: 80px;
+  height: 110px;
+  object-fit: cover;
+  border-radius: 4px;
+  float: right;
+  margin: 0 0 0.5rem 0.75rem;
+}
+
+/* ── Due-soon alert box ──────────────────────────────────── */
+.alert-box {
+  background: #fff8e1;
+  border-left: 4px solid #f0a500;
+  border-radius: 6px;
+  padding: 0.8rem 1rem;
+  margin-bottom: 0.8rem;
+  color: #5a3e00;
+}
+
+/* ── Pagination ──────────────────────────────────────────── */
+.pagination {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin: 0.5rem 0;
+}
+

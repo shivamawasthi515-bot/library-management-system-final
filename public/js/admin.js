@@ -21,7 +21,7 @@ const _bookCache = {};
 async function loadAdminData() {
   if (!ensureAdmin()) return;
 
-  await Promise.all([loadBooks(), loadUsers(), loadBorrows(), loadSearchAnalytics(), loadFeedbackItems()]);
+  await Promise.all([loadBooks(), loadUsers(1), loadBorrows(), loadSearchAnalytics(), loadFeedbackItems()]);
 }
 
 // ── Books ────────────────────────────────────────────────────────────────────
@@ -39,10 +39,12 @@ async function loadBooks() {
       .map(
         (b) => `
       <div class="book-card" id="book-card-${b._id}">
+        ${b.coverImage ? `<img src="${escHtml(b.coverImage)}" alt="Cover" class="book-cover">` : ''}
         <h3>${escHtml(b.title)}</h3>
         <p><strong>Authors:</strong> ${escHtml(b.authors.join(', '))}</p>
         <p><strong>Type:</strong> ${b.resourceType} &nbsp;|&nbsp; <strong>Available:</strong> ${b.availableCopies}/${b.totalCopies}</p>
         <p><strong>Category:</strong> ${escHtml(b.category || '-')}</p>
+        ${b.fileUrl ? `<p><a href="${escHtml(b.fileUrl)}" target="_blank" rel="noreferrer">📄 Digital/PDF</a></p>` : ''}
         <div style="margin-top:0.5rem;display:flex;gap:0.5rem;flex-wrap:wrap;">
           <button class="btn btn-small" onclick="toggleEditBook('${b._id}')">Edit</button>
           <button class="btn btn-small btn-danger" onclick="deleteBookItem('${b._id}')">Delete</button>
@@ -77,6 +79,9 @@ function toggleEditBook(id) {
         </div>
         <div class="form-group"><label>Total Copies</label><input id="et-copies-${id}" type="number" min="1" value="${b.totalCopies}"></div>
         <div class="form-group"><label>Category</label><input id="et-category-${id}" value="${escHtml(b.category || '')}"></div>
+        <div class="form-group"><label>Cover Image URL</label><input id="et-cover-${id}" value="${escHtml(b.coverImage || '')}" placeholder="https://…/cover.jpg"></div>
+        <div class="form-group"><label>Digital URL</label><input id="et-digital-${id}" value="${escHtml(b.digitalUrl || '')}" placeholder="https://…"></div>
+        <div class="form-group"><label>File / PDF URL</label><input id="et-file-${id}" value="${escHtml(b.fileUrl || '')}" placeholder="https://…/book.pdf"></div>
         <div class="form-group"><label>Description</label><textarea id="et-desc-${id}" rows="2">${escHtml(b.description || '')}</textarea></div>
         <div style="display:flex;gap:0.5rem;">
           <button class="btn btn-primary" type="submit">Save</button>
@@ -100,9 +105,12 @@ async function submitEditBook(event, id) {
     const resourceType = document.getElementById(`et-type-${id}`).value;
     const totalCopies = Number(document.getElementById(`et-copies-${id}`).value || 1);
     const category = document.getElementById(`et-category-${id}`).value.trim() || 'General';
+    const coverImage = document.getElementById(`et-cover-${id}`).value.trim();
+    const digitalUrl = document.getElementById(`et-digital-${id}`).value.trim();
+    const fileUrl = document.getElementById(`et-file-${id}`).value.trim();
     const description = document.getElementById(`et-desc-${id}`).value.trim();
 
-    await updateBook(id, { title, authors, resourceType, totalCopies, category, description });
+    await updateBook(id, { title, authors, resourceType, totalCopies, category, coverImage, digitalUrl, fileUrl, description });
     await loadBooks();
   } catch (error) {
     alert(error.message);
@@ -123,11 +131,25 @@ async function deleteBookItem(id) {
 
 // ── Users ────────────────────────────────────────────────────────────────────
 
-async function loadUsers() {
+let _usersPage = 1;
+const _usersLimit = 10;
+
+async function loadUsers(page = 1) {
+  _usersPage = page;
   try {
-    const data = await listUsers();
+    const search = document.getElementById('admin-users-search')?.value?.trim() || '';
+    const data = await listUsers(page, _usersLimit, search);
     const currentUser = getCurrentUser();
-    document.getElementById('admin-users').innerHTML = data.users
+    const container = document.getElementById('admin-users');
+
+    const paginationHtml = data.pages > 1 ? `
+      <div class="pagination" style="margin-bottom:0.5rem;">
+        ${page > 1 ? `<button class="btn btn-small" onclick="loadUsers(${page - 1})">← Prev</button>` : ''}
+        <span style="margin:0 0.5rem;">Page ${page} / ${data.pages} (${data.total} users)</span>
+        ${page < data.pages ? `<button class="btn btn-small" onclick="loadUsers(${page + 1})">Next →</button>` : ''}
+      </div>` : '';
+
+    container.innerHTML = paginationHtml + data.users
       .map(
         (u) => `
       <div class="book-card">
@@ -152,7 +174,7 @@ async function loadUsers() {
       </div>
     `
       )
-      .join('');
+      .join('') + paginationHtml;
   } catch (error) {
     document.getElementById('admin-users').innerHTML = `<div class="error">${error.message}</div>`;
   }
@@ -258,6 +280,9 @@ async function createBook(event) {
     const resourceType = document.getElementById('book-type').value;
     const totalCopies = Number(document.getElementById('book-copies').value || 1);
     const category = document.getElementById('book-category').value.trim() || 'General';
+    const coverImage = document.getElementById('book-cover').value.trim();
+    const digitalUrl = document.getElementById('book-digital').value.trim();
+    const fileUrl = document.getElementById('book-file').value.trim();
     const description = document.getElementById('book-description').value.trim();
 
     await createBookAPI({
@@ -267,6 +292,9 @@ async function createBook(event) {
         totalCopies,
         availableCopies: totalCopies,
         category,
+        coverImage,
+        digitalUrl,
+        fileUrl,
         description
       });
 

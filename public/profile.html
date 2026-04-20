@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My Profile - HLMS</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <nav class="navbar">
+    <div class="container nav-wrap">
+      <h1>📚 HLMS</h1>
+      <div class="nav-links">
+        <a href="/">Home</a>
+        <a href="/books">Books</a>
+        <a id="nav-dashboard" href="/dashboard" style="display:none;">Dashboard</a>
+        <a id="nav-admin" href="/admin" style="display:none;">Admin</a>
+        <span id="nav-user"></span>
+        <button id="nav-logout" class="btn btn-small" style="display:none;">Logout</button>
+      </div>
+    </div>
+  </nav>
+
+  <main class="container">
+    <section class="section auth-form" style="max-width:500px;margin:2rem auto;">
+      <h2>My Profile</h2>
+      <form id="profile-form" onsubmit="return submitProfile(event)">
+        <div class="form-group">
+          <label for="profile-name">Name</label>
+          <input id="profile-name" type="text" required>
+        </div>
+        <div class="form-group">
+          <label for="profile-email">Email</label>
+          <input id="profile-email" type="email" required>
+        </div>
+        <hr style="margin:1rem 0;">
+        <p style="font-weight:600;margin-bottom:0.5rem;">Change Password <small style="font-weight:normal">(leave blank to keep current)</small></p>
+        <div class="form-group">
+          <label for="profile-current-pw">Current Password</label>
+          <input id="profile-current-pw" type="password" autocomplete="current-password">
+        </div>
+        <div class="form-group">
+          <label for="profile-new-pw">New Password</label>
+          <input id="profile-new-pw" type="password" autocomplete="new-password" minlength="6">
+        </div>
+        <div class="form-group">
+          <label for="profile-confirm-pw">Confirm New Password</label>
+          <input id="profile-confirm-pw" type="password" autocomplete="new-password" minlength="6">
+        </div>
+        <button class="btn btn-primary" type="submit">Save Changes</button>
+      </form>
+      <div id="profile-status" style="margin-top:0.75rem;"></div>
+    </section>
+  </main>
+
+  <script src="/js/api.js"></script>
+  <script src="/js/nav.js"></script>
+  <script src="/js/profile.js"></script>
+</body>
+</html>
