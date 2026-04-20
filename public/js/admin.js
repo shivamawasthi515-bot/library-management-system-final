@@ -7,11 +7,121 @@ function ensureAdmin() {
   return true;
 }
 
+function escHtml(str) {
+  return String(str == null ? '' : str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+// In-memory cache so book data is available for edit forms
+const _bookCache = {};
+
 async function loadAdminData() {
   if (!ensureAdmin()) return;
 
-  await Promise.all([loadUsers(), loadBorrows(), loadSearchAnalytics(), loadFeedbackItems()]);
+  await Promise.all([loadBooks(), loadUsers(), loadBorrows(), loadSearchAnalytics(), loadFeedbackItems()]);
 }
+
+// ── Books ────────────────────────────────────────────────────────────────────
+
+async function loadBooks() {
+  try {
+    const data = await getBooks(1, 50);
+    data.books.forEach((b) => { _bookCache[b._id] = b; });
+    const container = document.getElementById('admin-books-list');
+    if (!data.books.length) {
+      container.innerHTML = '<p>No books found.</p>';
+      return;
+    }
+    container.innerHTML = data.books
+      .map(
+        (b) => `
+      <div class="book-card" id="book-card-${b._id}">
+        <h3>${escHtml(b.title)}</h3>
+        <p><strong>Authors:</strong> ${escHtml(b.authors.join(', '))}</p>
+        <p><strong>Type:</strong> ${b.resourceType} &nbsp;|&nbsp; <strong>Available:</strong> ${b.availableCopies}/${b.totalCopies}</p>
+        <p><strong>Category:</strong> ${escHtml(b.category || '-')}</p>
+        <div style="margin-top:0.5rem;display:flex;gap:0.5rem;flex-wrap:wrap;">
+          <button class="btn btn-small" onclick="toggleEditBook('${b._id}')">Edit</button>
+          <button class="btn btn-small btn-danger" onclick="deleteBookItem('${b._id}')">Delete</button>
+        </div>
+        <div id="edit-form-${b._id}" style="display:none;margin-top:0.8rem;"></div>
+      </div>
+    `
+      )
+      .join('');
+  } catch (error) {
+    document.getElementById('admin-books-list').innerHTML = `<div class="error">${error.message}</div>`;
+  }
+}
+
+function toggleEditBook(id) {
+  const formDiv = document.getElementById(`edit-form-${id}`);
+  if (!formDiv) return;
+  if (formDiv.style.display === 'none') {
+    const b = _bookCache[id];
+    if (!b) return;
+    formDiv.innerHTML = `
+      <hr style="margin:0.5rem 0;">
+      <form onsubmit="return submitEditBook(event, '${id}')">
+        <div class="form-group"><label>Title</label><input id="et-title-${id}" value="${escHtml(b.title)}" required></div>
+        <div class="form-group"><label>Authors (comma-separated)</label><input id="et-authors-${id}" value="${escHtml(b.authors.join(', '))}" required></div>
+        <div class="form-group"><label>Type</label>
+          <select id="et-type-${id}">
+            <option value="physical" ${b.resourceType === 'physical' ? 'selected' : ''}>physical</option>
+            <option value="digital"  ${b.resourceType === 'digital'  ? 'selected' : ''}>digital</option>
+            <option value="hybrid"   ${b.resourceType === 'hybrid'   ? 'selected' : ''}>hybrid</option>
+          </select>
+        </div>
+        <div class="form-group"><label>Total Copies</label><input id="et-copies-${id}" type="number" min="1" value="${b.totalCopies}"></div>
+        <div class="form-group"><label>Category</label><input id="et-category-${id}" value="${escHtml(b.category || '')}"></div>
+        <div class="form-group"><label>Description</label><textarea id="et-desc-${id}" rows="2">${escHtml(b.description || '')}</textarea></div>
+        <div style="display:flex;gap:0.5rem;">
+          <button class="btn btn-primary" type="submit">Save</button>
+          <button class="btn" type="button" onclick="document.getElementById('edit-form-${id}').style.display='none'">Cancel</button>
+        </div>
+      </form>`;
+    formDiv.style.display = 'block';
+  } else {
+    formDiv.style.display = 'none';
+  }
+}
+
+async function submitEditBook(event, id) {
+  event.preventDefault();
+  try {
+    const title = document.getElementById(`et-title-${id}`).value.trim();
+    const authors = document.getElementById(`et-authors-${id}`).value
+      .split(',')
+      .map((a) => a.trim())
+      .filter(Boolean);
+    const resourceType = document.getElementById(`et-type-${id}`).value;
+    const totalCopies = Number(document.getElementById(`et-copies-${id}`).value || 1);
+    const category = document.getElementById(`et-category-${id}`).value.trim() || 'General';
+    const description = document.getElementById(`et-desc-${id}`).value.trim();
+
+    await updateBook(id, { title, authors, resourceType, totalCopies, category, description });
+    await loadBooks();
+  } catch (error) {
+    alert(error.message);
+  }
+  return false;
+}
+
+async function deleteBookItem(id) {
+  const b = _bookCache[id];
+  if (!confirm(`Delete "${b ? b.title : id}"? The book will be hidden from the catalog.`)) return;
+  try {
+    await deleteBook(id);
+    await loadBooks();
+  } catch (error) {
+    alert(error.message);
+  }
+}
+
+// ── Users ────────────────────────────────────────────────────────────────────
 
 async function loadUsers() {
   try {
@@ -21,14 +131,22 @@ async function loadUsers() {
       .map(
         (u) => `
       <div class="book-card">
-        <h3>${u.name}</h3>
-        <p>${u.email}</p>
-        <p><strong>Role:</strong> <span id="role-${u._id}">${u.role}</span></p>
+        <h3>${escHtml(u.name)}</h3>
+        <p>${escHtml(u.email)}</p>
+        <p>
+          <strong>Role:</strong> ${u.role} &nbsp;|&nbsp;
+          <strong>Status:</strong> <span style="color:${u.isActive ? '#1b6d2a' : '#9f1a1a'}">${u.isActive ? 'Active' : 'Inactive'}</span>
+        </p>
         ${
           currentUser && u._id !== currentUser.id
-            ? `<button class="btn btn-small" onclick="changeRole('${u._id}', '${u.role === 'admin' ? 'user' : 'admin'}')">
-                Make ${u.role === 'admin' ? 'User' : 'Admin'}
-               </button>`
+            ? `<div style="margin-top:0.5rem;display:flex;gap:0.5rem;flex-wrap:wrap;">
+                <button class="btn btn-small" onclick="changeRole('${u._id}', '${u.role === 'admin' ? 'user' : 'admin'}')">
+                  Make ${u.role === 'admin' ? 'User' : 'Admin'}
+                </button>
+                <button class="btn btn-small ${u.isActive ? 'btn-danger' : ''}" onclick="toggleActive('${u._id}', ${!u.isActive})">
+                  ${u.isActive ? 'Deactivate' : 'Activate'}
+                </button>
+              </div>`
             : ''
         }
       </div>
@@ -49,6 +167,17 @@ async function changeRole(userId, newRole) {
   }
 }
 
+async function toggleActive(userId, isActive) {
+  try {
+    await setUserActive(userId, isActive);
+    await loadUsers();
+  } catch (error) {
+    alert(error.message);
+  }
+}
+
+// ── Borrows ──────────────────────────────────────────────────────────────────
+
 async function loadBorrows() {
   try {
     const data = await allBorrows();
@@ -57,9 +186,13 @@ async function loadBorrows() {
       .map(
         (b) => `
       <div class="book-card">
-        <h3>${b.book?.title || 'Unknown'}</h3>
-        <p><strong>User:</strong> ${b.user?.name || 'Unknown'} (${b.user?.email || '-'})</p>
+        <h3>${escHtml(b.book?.title || 'Unknown')}</h3>
+        <p><strong>User:</strong> ${escHtml(b.user?.name || 'Unknown')} (${escHtml(b.user?.email || '-')})</p>
         <p><strong>Status:</strong> ${b.status}</p>
+        <p><strong>Borrowed:</strong> ${new Date(b.createdAt).toLocaleString()}</p>
+        ${b.dueAt ? `<p><strong>Due:</strong> ${new Date(b.dueAt).toLocaleDateString()}</p>` : ''}
+        ${b.returnedAt ? `<p><strong>Returned:</strong> ${new Date(b.returnedAt).toLocaleString()}</p>` : ''}
+        ${b.status === 'borrowed' ? `<button class="btn btn-small" onclick="forceReturn('${b._id}')">Force Return</button>` : ''}
       </div>
     `
       )
@@ -69,11 +202,23 @@ async function loadBorrows() {
   }
 }
 
+async function forceReturn(borrowId) {
+  if (!confirm('Force-return this borrow record?')) return;
+  try {
+    await returnBorrow(borrowId);
+    await loadBorrows();
+  } catch (error) {
+    alert(error.message);
+  }
+}
+
+// ── Analytics & Feedback ─────────────────────────────────────────────────────
+
 async function loadSearchAnalytics() {
   try {
     const data = await listSearchAnalytics();
     const top = data.top
-      .map((s) => `<li>${s.query} (${s.count}) - ${new Date(s.lastSearchedAt).toLocaleString()}</li>`)
+      .map((s) => `<li>${escHtml(s.query)} (${s.count}) &mdash; ${new Date(s.lastSearchedAt).toLocaleString()}</li>`)
       .join('');
     document.getElementById('admin-searches').innerHTML = `<ul>${top || '<li>No search logs yet.</li>'}</ul>`;
   } catch (error) {
@@ -88,9 +233,9 @@ async function loadFeedbackItems() {
       .map(
         (f) => `
       <div class="book-card">
-        <p><strong>${f.user?.name || 'Unknown user'}</strong> (${f.user?.email || '-'})</p>
+        <p><strong>${escHtml(f.user?.name || 'Unknown user')}</strong> (${escHtml(f.user?.email || '-')})</p>
         <p><strong>Rating:</strong> ${f.rating}/5</p>
-        <p>${f.message}</p>
+        <p>${escHtml(f.message)}</p>
       </div>
     `
       )
@@ -99,6 +244,8 @@ async function loadFeedbackItems() {
     document.getElementById('admin-feedback').innerHTML = `<div class="error">${error.message}</div>`;
   }
 }
+
+// ── Add Book ─────────────────────────────────────────────────────────────────
 
 async function createBook(event) {
   event.preventDefault();
@@ -113,9 +260,7 @@ async function createBook(event) {
     const category = document.getElementById('book-category').value.trim() || 'General';
     const description = document.getElementById('book-description').value.trim();
 
-    await request('/books', {
-      method: 'POST',
-      body: JSON.stringify({
+    await createBookAPI({
         title,
         authors,
         resourceType,
@@ -123,11 +268,11 @@ async function createBook(event) {
         availableCopies: totalCopies,
         category,
         description
-      })
-    });
+      });
 
     document.getElementById('book-form').reset();
     document.getElementById('book-status').innerHTML = '<div class="success">Book added.</div>';
+    await loadBooks();
   } catch (error) {
     document.getElementById('book-status').innerHTML = `<div class="error">${error.message}</div>`;
   }

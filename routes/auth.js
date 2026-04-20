@@ -90,9 +90,12 @@ router.post('/setup-admin', async (req, res) => {
       return res.status(400).json({ success: false, error: 'Name, email and password (min 6 chars) are required' });
     }
 
-    // If a regular account already exists for this email, promote it instead of creating a duplicate
+    // If a regular account already exists for this email, verify the password before promoting
     let user = await User.findOne({ email: String(email).toLowerCase() });
     if (user) {
+      if (!(await user.comparePassword(password))) {
+        return res.status(401).json({ success: false, error: 'Invalid credentials for the existing account' });
+      }
       user.role = 'admin';
       await user.save();
     } else {

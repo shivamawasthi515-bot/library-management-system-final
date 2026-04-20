@@ -45,4 +45,25 @@ router.put('/users/:id/role', async (req, res) => {
   }
 });
 
+router.put('/users/:id/active', async (req, res) => {
+  try {
+    const isActive = req.body?.isActive;
+    if (typeof isActive !== 'boolean') {
+      return res.status(400).json({ success: false, error: 'isActive (boolean) is required' });
+    }
+
+    // Prevent an admin from deactivating themselves
+    if (String(req.user._id) === String(req.params.id) && !isActive) {
+      return res.status(400).json({ success: false, error: 'You cannot deactivate your own account' });
+    }
+
+    const user = await User.findByIdAndUpdate(req.params.id, { isActive }, { new: true }).select('-passwordHash').lean();
+    if (!user) return res.status(404).json({ success: false, error: 'User not found' });
+
+    return res.json({ success: true, user });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 module.exports = router;

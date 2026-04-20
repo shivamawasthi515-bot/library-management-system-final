@@ -101,6 +101,14 @@ body {
   padding: 0.45rem 0.7rem;
 }
 
+.btn-danger {
+  background-color: #d13e3e;
+}
+
+.btn-danger:hover {
+  background-color: #b03030;
+}
+
 .search-section {
   display: flex;
   gap: 0.75rem;

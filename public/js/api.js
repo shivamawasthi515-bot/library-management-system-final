@@ -113,6 +113,31 @@ function updateUserRole(userId, role) {
   });
 }
 
+function setUserActive(userId, isActive) {
+  return request(`/admin/users/${userId}/active`, {
+    method: 'PUT',
+    body: JSON.stringify({ isActive })
+  });
+}
+
+function createBookAPI(data) {
+  return request('/books', {
+    method: 'POST',
+    body: JSON.stringify(data)
+  });
+}
+
+function updateBook(bookId, data) {
+  return request(`/books/${bookId}`, {
+    method: 'PUT',
+    body: JSON.stringify(data)
+  });
+}
+
+function deleteBook(bookId) {
+  return request(`/books/${bookId}`, { method: 'DELETE' });
+}
+
 function forgotPasswordAPI(email) {
   return request('/auth/forgot-password', {
     method: 'POST',
