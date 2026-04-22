@@ -18,7 +18,8 @@ const searchProjection = {
   totalCopies: 1,
   digitalUrl: 1,
   fileUrl: 1,
-  category: 1
+  category: 1,
+  coverImage: 1
 };
 
 router.get('/', async (req, res) => {
@@ -76,14 +77,19 @@ router.get('/', async (req, res) => {
 
     const ranked = rankBooks(Array.from(unique.values()), q);
     const total = ranked.length;
-    const books = ranked.slice(skip, skip + limit).map(({ _rankScore, _textScore, ...rest }) => rest);
 
-    const aiEnhanced = await optionalAiEnhanceSearch({ query: q, results: books });
+    // Strip internal scoring fields and pass the FULL ranked list to the AI
+    // so it can rerank across all candidates, not just the current page.
+    const rankedClean = ranked.map(({ _rankScore, _textScore, ...rest }) => rest);
+    const aiEnhanced = await optionalAiEnhanceSearch({ query: q, results: rankedClean });
+
+    // Paginate AFTER AI reranking so the ordering is applied across all results.
+    const books = aiEnhanced.results.slice(skip, skip + limit);
 
     const payload = {
       success: true,
       query: q,
-      books: aiEnhanced.results,
+      books,
       total,
       page,
       pages: Math.ceil(total / limit),

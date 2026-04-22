@@ -5,6 +5,10 @@ const { authRequired, requireRole } = require('../middleware/auth');
 
 const router = express.Router();
 
+function escapeRegex(str) {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 router.use(authRequired, requireRole('admin'));
 
 router.get('/analytics/searches', async (req, res) => {
@@ -28,7 +32,7 @@ router.get('/users', async (req, res) => {
     const search = req.query.search ? String(req.query.search).trim() : '';
 
     const filter = search
-      ? { $or: [{ name: { $regex: search, $options: 'i' } }, { email: { $regex: search, $options: 'i' } }] }
+      ? { $or: [{ name: { $regex: escapeRegex(search), $options: 'i' } }, { email: { $regex: escapeRegex(search), $options: 'i' } }] }
       : {};
 
     const [users, total] = await Promise.all([
