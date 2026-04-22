@@ -1,58 +1,72 @@
-function normalize(str) {
-  return String(str || '')
-    .toLowerCase()
-    .trim()
-    .replace(/\s+/g, ' ');
+function normalizeText(value) {
+  return String(value || '').toLowerCase().trim().replace(/\s+/g, ' ');
 }
 
-// Escape regex special chars
 function escapeRegex(str) {
   return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-/**
- * Build a safe regex that matches tokens in order (good for partial titles)
- * Example: "digital signal" => /digital.*signal/i
- */
-function buildFuzzyRegex(query) {
-  const q = normalize(query);
-  if (!q) return null;
-
-  const tokens = q.split(' ').filter(Boolean).map(escapeRegex);
-  if (!tokens.length) return null;
-
-  return new RegExp(tokens.join('.*'), 'i');
+function buildPartialRegex(query) {
+  const normalized = normalizeText(query);
+  if (!normalized) return null;
+  const parts = normalized.split(' ').filter(Boolean).map(escapeRegex);
+  if (!parts.length) return null;
+  return new RegExp(parts.join('.*'), 'i');
 }
 
-/**
- * Simple scoring: boosts title matches above author/keywords.
- */
-function scoreBook(book, query) {
-  const q = normalize(query);
-  const title = normalize(book.title);
-  const author = normalize(book.author);
-  const desc = normalize(book.description);
-  const keywords = Array.isArray(book.keywords) ? book.keywords.map(normalize).join(' ') : '';
+function levenshtein(a, b) {
+  const left = normalizeText(a);
+  const right = normalizeText(b);
+  const matrix = Array.from({ length: left.length + 1 }, () => new Array(right.length + 1).fill(0));
 
-  let score = 0;
+  for (let i = 0; i <= left.length; i += 1) matrix[i][0] = i;
+  for (let j = 0; j <= right.length; j += 1) matrix[0][j] = j;
 
-  if (title === q) score += 100;
-  if (author === q) score += 70;
-
-  if (title.includes(q)) score += 60;
-  if (author.includes(q)) score += 40;
-  if (keywords.includes(q)) score += 25;
-  if (desc.includes(q)) score += 10;
-
-  // token bonus
-  const tokens = q.split(' ').filter(Boolean);
-  for (const t of tokens) {
-    if (title.includes(t)) score += 8;
-    if (author.includes(t)) score += 5;
-    if (keywords.includes(t)) score += 3;
+  for (let i = 1; i <= left.length; i += 1) {
+    for (let j = 1; j <= right.length; j += 1) {
+      const cost = left[i - 1] === right[j - 1] ? 0 : 1;
+      matrix[i][j] = Math.min(
+        matrix[i - 1][j] + 1,
+        matrix[i][j - 1] + 1,
+        matrix[i - 1][j - 1] + cost
+      );
+    }
   }
 
-  return score;
+  return matrix[left.length][right.length];
 }
 
-module.exports = { normalize, buildFuzzyRegex, scoreBook };
+function fuzzyScore(query, candidate) {
+  const q = normalizeText(query);
+  const c = normalizeText(candidate);
+  if (!q || !c) return 0;
+  if (c.includes(q)) return 1;
+  const dist = levenshtein(q, c);
+  const maxLen = Math.max(q.length, c.length);
+  return Math.max(0, 1 - dist / maxLen);
+}
+
+function rankBooks(books, query) {
+  const q = normalizeText(query);
+  return books
+    .map((book) => {
+      const title = normalizeText(book.title);
+      const authors = normalizeText((book.authors || []).join(' '));
+      const tags = normalizeText((book.tags || []).join(' '));
+      const desc = normalizeText(book.description || '');
+      const blob = `${title} ${authors} ${tags} ${desc}`;
+
+      const score =
+        (book._textScore || 0) * 5 +
+        (title.includes(q) ? 2 : 0) +
+        fuzzyScore(q, title) * 2 +
+        fuzzyScore(q, authors) +
+        fuzzyScore(q, tags) +
+        fuzzyScore(q, blob) * 0.5;
+
+      return { ...book, _rankScore: score };
+    })
+    .sort((a, b) => b._rankScore - a._rankScore);
+}
+
+module.exports = { normalizeText, buildPartialRegex, fuzzyScore, rankBooks };

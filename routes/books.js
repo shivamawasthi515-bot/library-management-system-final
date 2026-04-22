@@ -1,113 +1,114 @@
 const express = require('express');
+const mongoose = require('mongoose');
+const Book = require('../models/Book');
+const { authRequired, requireRole } = require('../middleware/auth');
+const cache = require('../utils/cache');
+
 const router = express.Router();
-const cache = require('../utils/cache'); // ✅ ADD THIS
 
-console.log('🔄 Setting up books routes...');
-
-// Import controller
-let bookController;
-try {
-  bookController = require('../controllers/bookController');
-  console.log('✓ Book controller imported');
-} catch (error) {
-  console.error('✗ Failed to import book controller:', error.message);
-  bookController = {
-    getAllBooks: (req, res) => res.json({ success: false, error: 'Controller not loaded', books: [] }),
-    searchBooks: (req, res) => res.json({ success: false, error: 'Controller not loaded', books: [] }),
-    filterBooks: (req, res) => res.json({ success: false, error: 'Controller not loaded', books: [] }),
-    getCategories: (req, res) => res.json({ success: false, error: 'Controller not loaded', categories: [] }),
-    getPublicationYears: (req, res) => res.json({ success: false, error: 'Controller not loaded', years: [] }),
-    getBookById: (req, res) => res.json({ success: false, error: 'Controller not loaded' }),
-  };
-}
-
-// ---------- READ ROUTES ----------
-router.get('/all', (req, res) => {
-  console.log('📚 /all route called');
-  return bookController.getAllBooks(req, res);
-});
-
-router.get('/search', (req, res) => {
-  console.log('🔍 /search route called');
-  return bookController.searchBooks(req, res);
-});
-
-router.get('/filter', (req, res) => {
-  console.log('🏷️  /filter route called');
-  return bookController.filterBooks(req, res);
-});
-
-router.get('/categories', (req, res) => {
-  console.log('📂 /categories route called');
-  return bookController.getCategories(req, res);
-});
-
-router.get('/years', (req, res) => {
-  console.log('📅 /years route called');
-  return bookController.getPublicationYears(req, res);
-});
-
-router.get('/:id', (req, res) => {
-  console.log(`📖 /:id route called with id=${req.params.id}`);
-  return bookController.getBookById(req, res);
-});
-
-// ---------- WRITE ROUTES (Phase-1 adminless) ----------
-router.post('/add', async (req, res) => {
+router.get('/', async (req, res) => {
   try {
-    const Book = require('../models/Book');
-    const book = await Book.create(req.body);
+    const page = Math.max(Number(req.query.page || 1), 1);
+    const limit = Math.min(Math.max(Number(req.query.limit || 12), 1), 50);
+    const skip = (page - 1) * limit;
 
-    // ✅ invalidate caches
-    cache.delByPrefix('books:all');
-    cache.delByPrefix('books:search');
-    cache.delByPrefix('books:categories');
-    cache.delByPrefix('books:years');
+    const filters = { isActive: true };
+    if (req.query.resourceType && ['physical', 'digital', 'hybrid'].includes(String(req.query.resourceType))) {
+      filters.resourceType = req.query.resourceType;
+    }
+    if (req.query.availableOnly === 'true') filters.availableCopies = { $gt: 0 };
 
-    return res.status(201).json({ success: true, message: 'Book added', book });
-  } catch (err) {
-    return res.status(500).json({ success: false, error: err.message });
+    const cacheKey = `books:list:${JSON.stringify({ page, limit, filters })}`;
+    const cached = cache.get(cacheKey);
+    if (cached) return res.json(cached);
+
+    const [books, total] = await Promise.all([
+      Book.find(filters).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
+      Book.countDocuments(filters)
+    ]);
+
+    const payload = { success: true, books, total, page, pages: Math.ceil(total / limit) };
+    cache.set(cacheKey, payload, 20_000);
+    return res.json(payload);
+  } catch (error) {
+    return res.status(500).json({ success: false, error: error.message });
   }
 });
 
-router.put('/:id', async (req, res) => {
+router.get('/:id', async (req, res) => {
   try {
-    const Book = require('../models/Book');
-    const book = await Book.findByIdAndUpdate(req.params.id, req.body, {
-      new: true,
-      runValidators: true,
-    });
+    if (!mongoose.isValidObjectId(req.params.id)) {
+      return res.status(400).json({ success: false, error: 'Invalid book id' });
+    }
+    const book = await Book.findById(req.params.id).lean();
+    if (!book || !book.isActive) {
+      return res.status(404).json({ success: false, error: 'Book not found' });
+    }
+    return res.json({ success: true, book });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
 
+router.post('/', authRequired, requireRole('admin'), async (req, res) => {
+  try {
+    const body = req.body || {};
+    if (!body.title || !Array.isArray(body.authors) || body.authors.length === 0) {
+      return res.status(400).json({ success: false, error: 'title and authors[] are required' });
+    }
+
+    const payload = {
+      ...body,
+      authors: body.authors.map((a) => String(a).trim()).filter(Boolean),
+      tags: Array.isArray(body.tags) ? body.tags.map((t) => String(t).toLowerCase()) : []
+    };
+
+    const book = await Book.create(payload);
+    cache.delByPrefix('books:list:');
+    cache.delByPrefix('search:');
+
+    return res.status(201).json({ success: true, book });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+router.put('/:id', authRequired, requireRole('admin'), async (req, res) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.id)) {
+      return res.status(400).json({ success: false, error: 'Invalid book id' });
+    }
+    const update = { ...req.body };
+    if (Array.isArray(update.authors)) update.authors = update.authors.map((a) => String(a).trim()).filter(Boolean);
+    if (Array.isArray(update.tags)) update.tags = update.tags.map((t) => String(t).toLowerCase());
+
+    const book = await Book.findByIdAndUpdate(req.params.id, update, { new: true, runValidators: true }).lean();
     if (!book) return res.status(404).json({ success: false, error: 'Book not found' });
 
-    cache.delByPrefix('books:all');
-    cache.delByPrefix('books:search');
-    cache.delByPrefix('books:categories');
-    cache.delByPrefix('books:years');
+    cache.delByPrefix('books:list:');
+    cache.delByPrefix('search:');
 
-    return res.json({ success: true, message: 'Book updated', book });
-  } catch (err) {
-    return res.status(500).json({ success: false, error: err.message });
+    return res.json({ success: true, book });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: error.message });
   }
 });
 
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', authRequired, requireRole('admin'), async (req, res) => {
   try {
-    const Book = require('../models/Book');
-    const book = await Book.findByIdAndDelete(req.params.id);
-
+    if (!mongoose.isValidObjectId(req.params.id)) {
+      return res.status(400).json({ success: false, error: 'Invalid book id' });
+    }
+    const book = await Book.findByIdAndUpdate(req.params.id, { isActive: false }, { new: true }).lean();
     if (!book) return res.status(404).json({ success: false, error: 'Book not found' });
 
-    cache.delByPrefix('books:all');
-    cache.delByPrefix('books:search');
-    cache.delByPrefix('books:categories');
-    cache.delByPrefix('books:years');
+    cache.delByPrefix('books:list:');
+    cache.delByPrefix('search:');
 
-    return res.json({ success: true, message: 'Book deleted' });
-  } catch (err) {
-    return res.status(500).json({ success: false, error: err.message });
+    return res.json({ success: true, message: 'Book removed' });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: error.message });
   }
 });
 
-console.log('✓ Books routes setup complete');
 module.exports = router;

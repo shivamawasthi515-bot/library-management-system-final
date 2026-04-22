@@ -1,95 +1,140 @@
-console.log('🔐 Auth.js loaded');
+function renderMessage(targetId, kind, text) {
+  const el = document.getElementById(targetId);
+  if (!el) return;
+  el.innerHTML = `<div class="${kind}">${text}</div>`;
+}
 
-function handleLogin(event) {
+function getRedirectPath(defaultPath) {
+  const redirect = new URLSearchParams(window.location.search).get('redirect');
+  return redirect && redirect.startsWith('/') ? redirect : defaultPath;
+}
+
+// Redirect already-authenticated users away from login/register pages
+(function redirectIfLoggedIn() {
+  const raw = localStorage.getItem('currentUser');
+  if (!raw) return;
+  const isAuthPage = ['/login', '/register', '/forgot-password', '/setup'].includes(window.location.pathname);
+  if (!isAuthPage) return;
+  try {
+    const user = JSON.parse(raw);
+    window.location.replace(user.role === 'admin' ? '/admin' : '/dashboard');
+  } catch (_) {
+    localStorage.removeItem('currentUser');
+    localStorage.removeItem('token');
+  }
+})();
+
+async function handleLogin(event) {
   event.preventDefault();
-
   const email = document.getElementById('email').value.trim();
   const password = document.getElementById('password').value;
 
-  if (!email || !password) {
-    alert('Please fill all fields');
-    return false;
+  try {
+    renderMessage('login-message', 'loading', 'Signing in...');
+    const data = await loginAPI(email, password);
+    localStorage.setItem('token', data.token);
+    localStorage.setItem('currentUser', JSON.stringify(data.user));
+    renderMessage('login-message', 'success', 'Login successful, redirecting...');
+    const defaultPath = data.user.role === 'admin' ? '/admin' : '/dashboard';
+    window.location.href = getRedirectPath(defaultPath);
+  } catch (error) {
+    renderMessage('login-message', 'error', error.message);
   }
 
-  loginUser(email, password);
   return false;
 }
 
-function handleRegister(event) {
+async function handleRegister(event) {
   event.preventDefault();
-
   const name = document.getElementById('name').value.trim();
   const email = document.getElementById('email').value.trim();
   const password = document.getElementById('password').value;
-  const confirmPassword = document.getElementById('confirmPassword').value;
+  const confirm = document.getElementById('confirmPassword').value;
 
-  if (!name || !email || !password) {
-    alert('Please fill all fields');
+  if (password !== confirm) {
+    renderMessage('register-message', 'error', 'Passwords do not match');
     return false;
   }
 
-  if (password !== confirmPassword) {
-    document.getElementById('register-message').innerHTML =
-      '<div class="error">✗ Passwords do not match</div>';
-    return false;
+  try {
+    renderMessage('register-message', 'loading', 'Creating account...');
+    const data = await registerAPI(name, email, password);
+    localStorage.setItem('token', data.token);
+    localStorage.setItem('currentUser', JSON.stringify(data.user));
+    renderMessage('register-message', 'success', 'Account created! Redirecting...');
+    window.location.href = '/dashboard';
+  } catch (error) {
+    renderMessage('register-message', 'error', error.message);
   }
 
-  registerUser(name, email, password);
   return false;
 }
 
-async function loginUser(email, password) {
-  const messageDiv = document.getElementById('login-message');
-  messageDiv.innerHTML = '<div class="loading">⏳ Logging in...</div>';
+async function handleForgotPassword(event) {
+  event.preventDefault();
+  const email = document.getElementById('fp-email').value.trim();
 
   try {
-    const response = await fetch('http://localhost:3001/api/auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password })
-    });
-
-    const data = await response.json();
-
-    if (response.ok && data.success) {
-      if (data.token) localStorage.setItem('token', data.token);
-
-      // ✅ store logged-in user
-      if (data.user) localStorage.setItem('currentUser', JSON.stringify(data.user));
-
-      messageDiv.innerHTML = '<div class="success">✓ Login successful! Redirecting...</div>';
-      setTimeout(() => (window.location.href = '/'), 1200);
-    } else {
-      messageDiv.innerHTML = `<div class="error">✗ ${data.error || data.message || 'Login failed'}</div>`;
-    }
+    renderMessage('fp-message', 'loading', 'Sending reset link...');
+    const data = await forgotPasswordAPI(email);
+    renderMessage('fp-message', 'success', data.message);
   } catch (error) {
-    console.error('✗ Login error:', error);
-    messageDiv.innerHTML = `<div class="error">✗ Error: ${error.message}</div>`;
+    renderMessage('fp-message', 'error', error.message);
   }
+
+  return false;
 }
 
-async function registerUser(name, email, password) {
-  const messageDiv = document.getElementById('register-message');
-  messageDiv.innerHTML = '<div class="loading">⏳ Registering...</div>';
+async function handleResetPassword(event) {
+  event.preventDefault();
+  const token = new URLSearchParams(window.location.search).get('token');
+  const password = document.getElementById('rp-password').value;
+  const confirm = document.getElementById('rp-confirm').value;
+
+  if (!token) {
+    renderMessage('rp-message', 'error', 'Invalid reset link. Please request a new one.');
+    return false;
+  }
+
+  if (password !== confirm) {
+    renderMessage('rp-message', 'error', 'Passwords do not match');
+    return false;
+  }
 
   try {
-    const response = await fetch('http://localhost:3001/api/auth/register', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, email, password })
-    });
-
-    const data = await response.json();
-
-    if (response.ok && data.success) {
-      messageDiv.innerHTML =
-        '<div class="success">✓ Registration successful! Redirecting to login...</div>';
-      setTimeout(() => (window.location.href = '/login'), 1200);
-    } else {
-      messageDiv.innerHTML = `<div class="error">✗ ${data.error || data.message || 'Registration failed'}</div>`;
-    }
+    renderMessage('rp-message', 'loading', 'Resetting password...');
+    const data = await resetPasswordAPI(token, password);
+    renderMessage('rp-message', 'success', `${data.message} <a href="/login">Login now</a>`);
+    document.getElementById('rp-form').style.display = 'none';
   } catch (error) {
-    console.error('✗ Register error:', error);
-    messageDiv.innerHTML = `<div class="error">✗ Error: ${error.message}</div>`;
+    renderMessage('rp-message', 'error', error.message);
   }
+
+  return false;
+}
+
+async function handleSetupAdmin(event) {
+  event.preventDefault();
+  const name = document.getElementById('setup-name').value.trim();
+  const email = document.getElementById('setup-email').value.trim();
+  const password = document.getElementById('setup-password').value;
+  const confirm = document.getElementById('setup-confirm').value;
+
+  if (password !== confirm) {
+    renderMessage('setup-message', 'error', 'Passwords do not match');
+    return false;
+  }
+
+  try {
+    renderMessage('setup-message', 'loading', 'Creating admin account...');
+    const data = await setupAdminAPI(name, email, password);
+    localStorage.setItem('token', data.token);
+    localStorage.setItem('currentUser', JSON.stringify(data.user));
+    renderMessage('setup-message', 'success', 'Admin account created! Redirecting to admin panel...');
+    window.location.href = '/admin';
+  } catch (error) {
+    renderMessage('setup-message', 'error', error.message);
+  }
+
+  return false;
 }
